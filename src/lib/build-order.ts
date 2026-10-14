@@ -58,7 +58,12 @@ export type ProviderOrder = Readonly<{
       unit_price?: unknown
       quantity?: unknown
       discount_total?: unknown
-      variant?: Readonly<{ weight?: number | null }> | null
+      variant?: Readonly<{
+        weight?: number | null
+        /** One variant unit consumes `required_quantity` of each item —
+         *  e.g. a 10-vial kit is 10 of the vial's item. */
+        inventory_items?: ReadonlyArray<Readonly<{ required_quantity?: unknown }> | null> | null
+      }> | null
     }>
   > | null
 }>
@@ -125,6 +130,15 @@ const deliveryAddress = (order: ProviderOrder): DeliveryAddress => {
   }
 }
 
+/** Physical units one variant unit consumes, across all its inventory items. */
+const unitsPerVariant = (line: NonNullable<ProviderOrder["items"]>[number] | undefined): number => {
+  const units = (line?.variant?.inventory_items ?? []).reduce((sum, link) => {
+    const required = toNumber(link?.required_quantity ?? 1)
+    return sum + (Number.isFinite(required) && required > 0 ? required : 1)
+  }, 0)
+  return units > 0 ? units : 1
+}
+
 export const buildOrderDispatchOrder = ({
   order,
   items,
@@ -147,13 +161,19 @@ export const buildOrderDispatchOrder = ({
       throw new OrderBuildError(`${sku} has an invalid quantity`)
     }
     const line = item.line_item_id ? orderItems.get(item.line_item_id) : undefined
-    const grams = toNumber(line?.variant?.weight)
+    // Medusa fulfils `required_quantity × ordered` of each item, so a kit
+    // arrives as 10 vials: price, discount and weight are per physical unit.
+    const perVariant = unitsPerVariant(line)
+    const lineQuantity = toNumber(line?.quantity)
+    const discount = toNumber(line?.discount_total)
+    const grams = toNumber(line?.variant?.weight) / perVariant
     return {
       Sku: sku,
       Title: text(item.title) || text(line?.title) || sku,
       Quantity: quantity,
-      RetailPrice: money(line?.unit_price),
-      DiscountAmount: money(line?.discount_total),
+      RetailPrice: money(toNumber(line?.unit_price) / perVariant),
+      DiscountAmount:
+        lineQuantity > 0 && Number.isFinite(discount) ? money((discount * quantity) / (lineQuantity * perVariant)) : 0,
       ...(Number.isFinite(grams) && grams > 0 ? { Weight: Math.round(grams) / 1000 } : {}),
       ...(item.line_item_id ? { LineItemId: item.line_item_id } : {}),
     }

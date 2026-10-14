@@ -52,6 +52,27 @@ describe("buildOrderDispatchOrder", () => {
     ])
   })
 
+  it("prices a kit per vial: Medusa fulfils required_quantity × ordered", () => {
+    const kitOrder: ProviderOrder = {
+      ...order,
+      items: [
+        {
+          id: "li_kit",
+          title: "Retatrutide Kit",
+          unit_price: 300,
+          quantity: 2,
+          discount_total: 60,
+          variant: { weight: 500, inventory_items: [{ required_quantity: 10 }] },
+        },
+      ],
+    }
+    const { request } = buildOrderDispatchOrder({
+      order: kitOrder,
+      items: [{ line_item_id: "li_kit", sku: "RETATRUTIDE-10MG", title: "Retatrutide 10mg", quantity: 20 }],
+    })
+    expect(request.OrderItems[0]).toMatchObject({ Quantity: 20, RetailPrice: 30, DiscountAmount: 60, Weight: 0.05 })
+  })
+
   it("gives resends their own reference and no shipping charge", () => {
     const { reference, request } = buildOrderDispatchOrder({ order, items, resendClaimId: "claim_01JABCDEFGH12345678" })
     expect(reference).toBe("1201-R-12345678")
