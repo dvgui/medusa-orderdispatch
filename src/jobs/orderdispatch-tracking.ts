@@ -18,7 +18,7 @@ import { markOrderDispatchShippedWorkflow } from "../workflows/mark-orderdispatc
  */
 export default async function orderDispatchTrackingJob(container: MedusaContainer) {
   const logger = container.resolve<Logger>(ContainerRegistrationKeys.LOGGER)
-  if (process.env.ORDERDISPATCH_ENABLED !== "true") return
+  if (process.env.ORDERDISPATCH_ENABLED?.trim().toLowerCase() !== "true") return
   const started = Date.now()
 
   try {

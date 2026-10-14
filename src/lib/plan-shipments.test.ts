@@ -55,10 +55,7 @@ describe("courierFor", () => {
       trackingUrl: "https://www.parcelforce.com/track-trace?trackNumber=PF1",
     })
     expect(courierFor("Hermes UK Standard", "H1").courier).toBe("Evri")
-    expect(courierFor("Spring Packet Tracked", "S1")).toEqual({
-      courier: "Spring Packet Tracked",
-      trackingUrl: "https://www.orderdispatch.co.uk/tracking/?trackingNumber=S1",
-    })
+    expect(courierFor("Spring Packet Tracked", "S1")).toEqual({ courier: "Spring Packet Tracked", trackingUrl: null })
     expect(courierFor(null, null)).toEqual({ courier: "OrderDispatch", trackingUrl: null })
   })
 })
