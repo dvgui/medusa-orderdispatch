@@ -93,6 +93,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         order: order as unknown as ProviderOrder,
         items: items as ProviderFulfillmentItem[],
         resendClaimId: typeof resendClaimId === "string" ? resendClaimId : null,
+        referencePrefix: this.options_.referencePrefix,
       })
       await this.#assertSkusKnown(built.request.OrderItems.map((line) => line.Sku))
 

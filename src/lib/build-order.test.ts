@@ -90,6 +90,15 @@ describe("buildOrderDispatchOrder", () => {
     expect(() => buildOrderDispatchOrder({ order, items: [] })).toThrow("Fulfillment has no items")
   })
 
+  it("prefixes the reference when environments share one ODM account", () => {
+    const { reference, request } = buildOrderDispatchOrder({ order, items, referencePrefix: "DEV-" })
+    expect(reference).toBe("DEV-1201")
+    expect(request.ShippingDetails.ReferenceNumber).toBe("DEV-1201")
+    expect(buildOrderDispatchOrder({ order, items, resendClaimId: "claim_x12345678", referencePrefix: "DEV-" }).reference).toBe(
+      "DEV-1201-R-12345678"
+    )
+  })
+
   it("tags orders without a storefront as unknown rather than failing", () => {
     expect(buildOrderDispatchOrder({ order: { ...order, metadata: null }, items }).subSource).toBe("unknown")
   })

@@ -92,15 +92,17 @@ export class OrderBuildError extends Error {
 /**
  * The ReferenceNumber processed orders are matched back by. Resends get the
  * same `<display>-R-<claim tail>` shape the Royal Mail integration uses, so a
- * replacement never collides with the original shipment.
+ * replacement never collides with the original shipment. `prefix` keeps
+ * environments sharing one ODM account apart (dev sends `DEV-1234`).
  */
 export const orderReference = (
   order: Pick<ProviderOrder, "display_id" | "id">,
-  resendClaimId?: string | null
+  resendClaimId?: string | null,
+  prefix = ""
 ): string => {
   const base = String(order.display_id ?? order.id ?? "").trim()
   if (!base) throw new OrderBuildError("Order has neither a display id nor an id")
-  return resendClaimId ? `${base}-R-${resendClaimId.slice(-8)}` : base
+  return `${prefix}${resendClaimId ? `${base}-R-${resendClaimId.slice(-8)}` : base}`
 }
 
 const deliveryAddress = (order: ProviderOrder): DeliveryAddress => {
@@ -143,10 +145,12 @@ export const buildOrderDispatchOrder = ({
   order,
   items,
   resendClaimId,
+  referencePrefix = "",
 }: Readonly<{
   order: ProviderOrder
   items: readonly ProviderFulfillmentItem[]
   resendClaimId?: string | null
+  referencePrefix?: string
 }>): BuiltOrder => {
   if (!items.length) throw new OrderBuildError("Fulfillment has no items")
   const orderItems = new Map((order.items ?? []).map((i) => [i.id, i]))
@@ -179,7 +183,7 @@ export const buildOrderDispatchOrder = ({
     }
   })
 
-  const reference = orderReference(order, resendClaimId)
+  const reference = orderReference(order, resendClaimId, referencePrefix)
   const address = deliveryAddress(order)
   const { Email: _email, Address3: _address3, ...billing } = address
   const subSource = text(order.metadata?.storefront) || "unknown"

@@ -7,6 +7,9 @@ export type OrderDispatchProviderOptions = Readonly<{
   baseUrl?: string
   /** CreateOrder `source`; `subSource` is the order's storefront slug. */
   source?: string
+  /** Prepended to every ReferenceNumber, so environments sharing one ODM
+   *  account never match each other's orders (e.g. "DEV-" on dev). */
+  referencePrefix?: string
   /** Refuse to push when a SKU is unknown to ODM (default true). */
   checkSkus?: boolean
   /** How long the ODM SKU list is cached for that check (default 5 min). */
@@ -15,7 +18,7 @@ export type OrderDispatchProviderOptions = Readonly<{
 }>
 
 export type ResolvedOrderDispatchOptions = OrderDispatchProviderOptions &
-  Required<Pick<OrderDispatchProviderOptions, "source" | "checkSkus" | "skuCacheMs">>
+  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "checkSkus" | "skuCacheMs">>
 
 export const resolveOrderDispatchOptions = (
   options: Partial<OrderDispatchProviderOptions> | undefined
@@ -33,6 +36,7 @@ export const resolveOrderDispatchOptions = (
     username,
     password,
     source: options?.source?.trim() || "MEDUSA",
+    referencePrefix: options?.referencePrefix?.trim() ?? "",
     checkSkus: options?.checkSkus ?? true,
     skuCacheMs: options?.skuCacheMs ?? 5 * 60_000,
   }

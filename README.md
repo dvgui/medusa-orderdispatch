@@ -51,6 +51,8 @@ modules: [{
       username: process.env.ORDERDISPATCH_USERNAME,
       password: process.env.ORDERDISPATCH_PASSWORD,
       source: process.env.ORDERDISPATCH_SOURCE, // default MEDUSA
+      // Environments sharing one ODM account must not share references:
+      referencePrefix: process.env.ORDERDISPATCH_REFERENCE_PREFIX, // e.g. "DEV-" on dev
     },
   }] },
 }]
