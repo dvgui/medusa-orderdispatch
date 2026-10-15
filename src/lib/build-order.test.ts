@@ -73,6 +73,12 @@ describe("buildOrderDispatchOrder", () => {
     expect(request.OrderItems[0]).toMatchObject({ Quantity: 20, RetailPrice: 30, DiscountAmount: 60, Weight: 0.05 })
   })
 
+  it("accepts the bignumber.js quantities Medusa computes for fulfillment lines", () => {
+    const qty = { s: 1, e: 0, c: [1], toNumber: () => 1 }
+    const { request } = buildOrderDispatchOrder({ order, items: [{ ...items[0], quantity: qty }] })
+    expect(request.OrderItems[0].Quantity).toBe(1)
+  })
+
   it("gives resends their own reference and no shipping charge", () => {
     const { reference, request } = buildOrderDispatchOrder({ order, items, resendClaimId: "claim_01JABCDEFGH12345678" })
     expect(reference).toBe("1201-R-12345678")
@@ -110,6 +116,8 @@ describe("orderReference / toNumber", () => {
   })
   it("reads Medusa BigNumber shapes", () => {
     expect(toNumber({ numeric: 12.5 })).toBe(12.5)
+    // bignumber.js instance shape (MathBN.mult result): { s, e, c } + methods
+    expect(toNumber({ s: 1, e: 1, c: [10], toNumber: () => 10 })).toBe(10)
     expect(toNumber({ value: "3" })).toBe(3)
     expect(toNumber("4.2")).toBe(4.2)
     expect(Number.isNaN(toNumber(undefined))).toBe(true)

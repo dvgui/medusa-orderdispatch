@@ -14,6 +14,10 @@ export const toNumber = (value: unknown): number => {
   if (typeof value === "number") return value
   if (typeof value === "string") return Number(value)
   if (value && typeof value === "object") {
+    // bignumber.js, e.g. MathBN.mult(required_quantity, quantity) on the
+    // fulfillment lines Medusa hands the provider.
+    const toNum = (value as { toNumber?: unknown }).toNumber
+    if (typeof toNum === "function") return Number(toNum.call(value))
     const numeric = (value as { numeric?: unknown }).numeric
     if (typeof numeric === "number") return numeric
     if ("value" in value) return Number((value as { value: unknown }).value)
