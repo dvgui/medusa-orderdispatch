@@ -1,5 +1,6 @@
 import type { OrderDispatchFulfillmentData } from "../constants"
 import type { MarkOrderDispatchShippedInput } from "../workflows/mark-orderdispatch-shipped"
+import { toNumber } from "./build-order"
 import type { ProcessedOrder } from "./orderdispatch-client/types"
 import { courierFor } from "./tracking"
 
@@ -37,7 +38,8 @@ export const planShipments = (
     const { courier, trackingUrl } = courierFor(processed.ServiceName, trackingNumber)
     const items = (fulfillment.items ?? [])
       .filter((item): item is { line_item_id: string; quantity?: unknown } => Boolean(item.line_item_id))
-      .map((item) => ({ id: item.line_item_id, quantity: Number(item.quantity ?? 0) }))
+      // Query returns quantities as BigNumber; Number() of one is NaN.
+      .map((item) => ({ id: item.line_item_id, quantity: toNumber(item.quantity ?? 0) }))
 
     return [
       {

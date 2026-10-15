@@ -41,6 +41,27 @@ describe("planShipments", () => {
     expect(input.data).toMatchObject({ odOrderNumber: "9001", odCourier: "Royal Mail", odTrackingNumber: "TT123456789GB" })
   })
 
+  it("reads BigNumber quantities as Medusa's query returns them", () => {
+    const [planned] = planShipments(
+      [
+        {
+          id: "ful_1",
+          data: { odReference: "1201" },
+          order: { id: "order_1" },
+          items: [
+            { line_item_id: "li_1", quantity: { numeric: 2, value: "2" } },
+            { line_item_id: "li_2", quantity: { value: "10", precision: 20 } },
+          ],
+        },
+      ],
+      processed
+    )
+    expect(planned.input.items).toEqual([
+      { id: "li_1", quantity: 2 },
+      { id: "li_2", quantity: 10 },
+    ])
+  })
+
   it("marks a dispatched order shipped even without a tracking number", () => {
     const [planned] = planShipments([{ id: "ful_2", data: { odReference: "1202" }, order: { id: "order_2" } }], processed)
     expect(planned.input.tracking_number).toBe("")
