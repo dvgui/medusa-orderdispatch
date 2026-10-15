@@ -78,11 +78,11 @@ describe("OrderDispatchClient", () => {
       DeliveryAddress: { FullName: "A B", Address1: "1 St", Town: "T", PostCode: "P", Country: "GB" },
       ShippingDetails: { ReferenceNumber: "1001" },
     }
-    await expect(client.createOrder(order, { source: "MEDUSA", subSource: "peppys_uk" })).rejects.toThrow(
+    await expect(client.createOrder(order, { source: "WebApp", subSource: "peppys_uk" })).rejects.toThrow(
       "OrderDispatch rejected order 1001: Unknown SKU RETA-X"
     )
     const url = new URL(calls[1].url)
-    expect(url.searchParams.get("source")).toBe("MEDUSA")
+    expect(url.searchParams.get("source")).toBe("WebApp")
     expect(url.searchParams.get("subSource")).toBe("peppys_uk")
   })
 

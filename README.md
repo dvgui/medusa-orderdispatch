@@ -10,7 +10,9 @@ shipped (with tracking) once ODM dispatches it.
 - **Push — `createFulfillment`** (`src/providers/orderdispatch/service.ts`)
   - Builds an ODM `CreateOrder` from the order Medusa passes the provider (`src/lib/build-order.ts`).
   - `ReferenceNumber` is the order's display id, or `<display>-R-<claim tail>` for resends. Processed orders are matched back by it.
-  - `source` comes from the provider options (default `MEDUSA`); `subSource` is `order.metadata.storefront`.
+  - `source` comes from the provider options (default `WebApp`).
+    - ODM only accepts a source it knows: `WebApp`, or a configured channel integration. An unknown one fails CreateOrder with a .NET null reference.
+    - `subSource` is free text: `order.metadata.storefront`.
   - Each line's `Sku` is the fulfillment line's SKU, which Medusa copies from the **inventory item's `sku`**. Every physical product must therefore have one inventory item named by its warehouse SKU.
   - Before pushing, each SKU is resolved to the ODM stock item it ships as: its exact SKU and its `StockItemId`.
     - The lookup uses `GET /Api/AmazonFBAInventorySearch/Search?text=`. It's the inventory search ODM's own Create Order screen uses, and the only call that returns `StockItemId`. It isn't in the public Swagger.
@@ -59,7 +61,7 @@ modules: [{
     options: {
       username: process.env.ORDERDISPATCH_USERNAME,
       password: process.env.ORDERDISPATCH_PASSWORD,
-      source: process.env.ORDERDISPATCH_SOURCE, // default MEDUSA
+      source: process.env.ORDERDISPATCH_SOURCE, // default WebApp (must be a source ODM knows)
       // Environments sharing one ODM account must not share references:
       referencePrefix: process.env.ORDERDISPATCH_REFERENCE_PREFIX, // e.g. "DEV-" on dev
       // ODM prefixes each client's stock items ("KREL-…"); Medusa SKUs stay plain:

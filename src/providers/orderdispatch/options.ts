@@ -5,7 +5,9 @@ export type OrderDispatchProviderOptions = Readonly<{
   username: string
   password: string
   baseUrl?: string
-  /** CreateOrder `source`; `subSource` is the order's storefront slug. */
+  /** CreateOrder `source` (default "WebApp"). ODM only accepts a source it
+   *  knows — "WebApp" or a configured channel integration; anything else fails
+   *  with a .NET null reference. `subSource` (free text) is the storefront slug. */
   source?: string
   /** Prepended to every ReferenceNumber, so environments sharing one ODM
    *  account never match each other's orders (e.g. "DEV-" on dev). */
@@ -39,7 +41,7 @@ export const resolveOrderDispatchOptions = (
     ...options,
     username,
     password,
-    source: options?.source?.trim() || "MEDUSA",
+    source: options?.source?.trim() || "WebApp",
     referencePrefix: options?.referencePrefix?.trim() ?? "",
     skuPrefix: options?.skuPrefix?.trim() ?? "",
     shippingService: options?.shippingService?.trim() || "StandardDelivery",
