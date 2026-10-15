@@ -30,6 +30,19 @@ const money = (value: unknown): number => {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
 }
 
+/** A short, safe description of a value for error messages. */
+const describe = (value: unknown): string => {
+  const kind = value === null ? "null" : typeof value
+  const name = value && typeof value === "object" ? (value as object).constructor?.name : undefined
+  let json = ""
+  try {
+    json = JSON.stringify(value) ?? ""
+  } catch {
+    json = "[unserialisable]"
+  }
+  return `${kind}${name && name !== "Object" ? ` ${name}` : ""} ${json.slice(0, 120)}`.trim()
+}
+
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "")
 
 /** The order fields read here (a subset of FulfillmentOrderDTO as loaded by
@@ -166,7 +179,7 @@ export const buildOrderDispatchOrder = ({
     if (!sku) throw new OrderBuildError(`${label} has no SKU`)
     const quantity = toNumber(item.quantity)
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw new OrderBuildError(`${sku} has an invalid quantity`)
+      throw new OrderBuildError(`${sku} has an invalid quantity (${describe(item.quantity)})`)
     }
     const line = item.line_item_id ? orderItems.get(item.line_item_id) : undefined
     // Medusa fulfils `required_quantity × ordered` of each item, so a kit
