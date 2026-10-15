@@ -12,8 +12,11 @@ shipped (with tracking) once ODM dispatches it.
   - `ReferenceNumber` is the order's display id, or `<display>-R-<claim tail>` for resends. Processed orders are matched back by it.
   - `source` comes from the provider options (default `MEDUSA`); `subSource` is `order.metadata.storefront`.
   - Each line's `Sku` is the fulfillment line's SKU, which Medusa copies from the **inventory item's `sku`**. Every physical product must therefore have one inventory item named by its warehouse SKU.
-  - Before pushing, every SKU is checked against ODM's stock list (cached 5 min). An unknown SKU fails the fulfilment with a clear message instead of creating an unpickable ODM order.
-  - ODM prefixes each client's stock items with a company code (`KREL-`). With `skuPrefix`, a plain Medusa SKU resolves to the stock item ODM holds (plain first, then prefixed), and the order line carries that exact SKU.
+  - Before pushing, each SKU is resolved to the ODM stock item it ships as: its exact SKU and its `StockItemId`.
+    - The lookup uses `GET /Api/AmazonFBAInventorySearch/Search?text=`. It's the inventory search ODM's own Create Order screen uses, and the only call that returns `StockItemId`. It isn't in the public Swagger.
+    - CreateOrder fails with a .NET null reference without `StockItemId`.
+    - ODM prefixes each client's stock items with a company code (`KREL-`). With `skuPrefix`, a plain Medusa SKU matches `KREL-<SKU>`; plain matches are tried first.
+    - An unknown SKU fails the fulfilment with a clear message instead of creating an unpickable ODM order. Lookups are cached 5 min (`skuCacheMs`).
   - The request matches what ODM's own Create Order screen sends, because its API fails with a .NET null reference on anything else:
     - every DeliveryAddress field is a string (empty when unknown)
     - no BillingAddress

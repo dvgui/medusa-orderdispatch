@@ -33,7 +33,7 @@ describe("OrderDispatchFulfillmentService", () => {
   it("pushes the order with the storefront as subSource and stores ODM's order number", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
-      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-1", Sku: "RETATRUTIDE-10MG" }]))
       .mockResolvedValueOnce(answer(["United Kingdom", "Germany"]))
       .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9001" }))
 
@@ -43,7 +43,7 @@ describe("OrderDispatchFulfillmentService", () => {
     const createCall = fetchSpy.mock.calls[3] as [URL, RequestInit]
     expect(createCall[0].searchParams.get("subSource")).toBe("buyreta_eu")
     const body = JSON.parse(String(createCall[1].body))
-    expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", Weight: 0.11 })
+    expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", StockItemId: "si-1", Weight: 0.11 })
     // ODM takes its own country NAME, not the ISO code.
     expect(body.DeliveryAddress.Country).toBe("Germany")
     expect(body.ShippingDetails.ShippingService).toBe("StandardDelivery")
@@ -52,20 +52,24 @@ describe("OrderDispatchFulfillmentService", () => {
   it("sends the company-prefixed stock item ODM holds", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
-      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "KREL-RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-krel", Sku: "KREL-RETATRUTIDE-10MG" }, { StockItemId: "si-other", Sku: "KREL-RETATRUTIDE-10MG-KIT" }]))
       .mockResolvedValueOnce(answer(["Germany"]))
       .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9002" }))
 
     await make({ skuPrefix: "KREL-" }).createFulfillment({}, items, order, { metadata: {} } as never)
 
     const createCall = fetchSpy.mock.calls[3] as [URL, RequestInit]
-    expect(JSON.parse(String(createCall[1].body)).OrderItems[0].Sku).toBe("KREL-RETATRUTIDE-10MG")
+    expect(JSON.parse(String(createCall[1].body)).OrderItems[0]).toMatchObject({ Sku: "KREL-RETATRUTIDE-10MG", StockItemId: "si-krel" })
+    // The lookup is ODM's inventory search for the plain SKU.
+    const searchCall = fetchSpy.mock.calls[1] as [URL, RequestInit]
+    expect(searchCall[0].pathname).toBe("/Api/AmazonFBAInventorySearch/Search")
+    expect(searchCall[0].searchParams.get("text")).toBe("RETATRUTIDE-10MG")
   })
 
   it("refuses a delivery country ODM doesn't list, before creating anything", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
-      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-1", Sku: "RETATRUTIDE-10MG" }]))
       .mockResolvedValueOnce(answer(["United Kingdom"]))
 
     await expect(make().createFulfillment({}, items, order, { metadata: {} } as never)).rejects.toThrow(
@@ -84,7 +88,7 @@ describe("OrderDispatchFulfillmentService", () => {
   it("refuses a SKU OrderDispatch doesn't stock, before creating anything", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
-      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "OTHER-SKU", Available: 1, InStock: 1, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-x", Sku: "OTHER-SKU" }]))
 
     await expect(make().createFulfillment({}, items, order, {} as never)).rejects.toThrow(
       "OrderDispatch: RETATRUTIDE-10MG is not set up in OrderDispatch"

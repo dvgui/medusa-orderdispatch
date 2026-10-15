@@ -16,6 +16,9 @@ export type ValidateUserResponse = Readonly<{
 }>
 
 export type CreateOrderItem = Readonly<{
+  /** ODM's stock item GUID. ODM's own screen always sends it, and CreateOrder
+   *  fails with a .NET null reference without it. */
+  StockItemId?: string
   Sku: string
   Title?: string
   Quantity: number
@@ -74,6 +77,20 @@ export type CreateOrderResponse = Readonly<{
   OrderNumber?: string | null
   ShippingScriptExecutedSuccessfully?: boolean
   Error?: string | null
+}>
+
+/**
+ * GET /Api/AmazonFBAInventorySearch/Search?text= — the inventory search ODM's
+ * own Create Order screen uses (not in the public Swagger), the only call that
+ * returns a stock item's StockItemId. `text` matches SKU, title or barcode.
+ */
+export type StockItemSearchResult = Readonly<{
+  StockItemId: string
+  Sku: string
+  Title?: string | null
+  Weight?: number | null
+  RetailPrice?: number | null
+  bContainsComposites?: boolean
 }>
 
 /** GET /api/CreateOrder/GetCountries — country names, e.g. "United Kingdom". */

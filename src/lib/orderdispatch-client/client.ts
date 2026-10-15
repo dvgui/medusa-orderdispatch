@@ -8,6 +8,7 @@ import type {
   ProcessedOrderResponse,
   ShippingRate,
   ShippingRatesResponse,
+  StockItemSearchResult,
   StockLevel,
   StockLevelResponse,
   ValidateUserResponse,
@@ -101,6 +102,14 @@ export class OrderDispatchClient {
     const response = await this.#request<ProcessedOrderResponse>("GET", "/api/ProcessedOrders/GetProcessedOrders")
     if (!response.Success) throw new OrderDispatchError("OrderDispatch GetProcessedOrders was not successful")
     return response.ProcessedOrders ?? []
+  }
+
+  /** Stock items whose SKU, title or barcode contains `text` (with StockItemId). */
+  async searchStockItems(text: string): Promise<readonly StockItemSearchResult[]> {
+    const response = await this.#request<StockItemSearchResult[]>("GET", "/Api/AmazonFBAInventorySearch/Search", {
+      query: { text, ignoreComposite: "true" },
+    })
+    return Array.isArray(response) ? response : []
   }
 
   /** ODM's country names; CreateOrder's Country must be one of them. */

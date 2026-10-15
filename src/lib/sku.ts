@@ -1,9 +1,10 @@
 /**
- * ODM namespaces each client's stock items with a company prefix (Add Item
- * shows a fixed "KREL-" before the SKU), while Medusa's warehouse SKUs stay
- * plain ("RETATRUTIDE-10MG"). An order line must carry the SKU exactly as ODM
- * stores it, so each Medusa SKU resolves to the stock item that exists:
- * the plain SKU first, then `prefix + SKU`.
+ * ODM namespaces each client's stock items with a company prefix (Add Item and
+ * the inventory import turn RETATRUTIDE-10MG into KREL-RETATRUTIDE-10MG),
+ * while Medusa's warehouse SKUs stay plain. An order line must carry the stock
+ * item ODM holds — its exact SKU and its StockItemId — so each Medusa SKU
+ * resolves to the stock item that exists: the plain SKU first, then
+ * `prefix + SKU`.
  */
 export const odmCandidates = (sku: string, prefix: string): string[] => {
   const plain = sku.trim()
@@ -11,32 +12,16 @@ export const odmCandidates = (sku: string, prefix: string): string[] => {
   return prefixed ? [plain, prefixed] : [plain]
 }
 
-/** The SKU to send when ODM's stock list isn't consulted. */
-export const odmSkuFor = (sku: string, prefix: string): string => {
-  const candidates = odmCandidates(sku, prefix)
-  return candidates[candidates.length - 1]
-}
+export type OdmStockItem = Readonly<{ Sku: string; StockItemId: string }>
 
-export type SkuResolution = Readonly<{
-  /** Medusa SKU → ODM stock item number, in ODM's own casing. */
-  resolved: ReadonlyMap<string, string>
-  missing: readonly string[]
-}>
-
-export const resolveOdmSkus = (
-  skus: readonly string[],
-  stockItemNumbers: readonly string[],
+/** The stock item for one Medusa SKU among ODM search results, if any. */
+export const matchOdmStockItem = (
+  sku: string,
+  results: ReadonlyArray<OdmStockItem>,
   prefix: string
-): SkuResolution => {
-  const byUpper = new Map(stockItemNumbers.map((n) => [n.trim().toUpperCase(), n.trim()]))
-  const resolved = new Map<string, string>()
-  const missing: string[] = []
-  for (const sku of new Set(skus)) {
-    const hit = odmCandidates(sku, prefix)
-      .map((candidate) => byUpper.get(candidate.toUpperCase()))
-      .find(Boolean)
-    if (hit) resolved.set(sku, hit)
-    else missing.push(sku)
-  }
-  return { resolved, missing }
+): OdmStockItem | undefined => {
+  const bySku = new Map(results.map((r) => [r.Sku.trim().toUpperCase(), r]))
+  return odmCandidates(sku, prefix)
+    .map((candidate) => bySku.get(candidate.toUpperCase()))
+    .find((hit): hit is OdmStockItem => Boolean(hit?.StockItemId))
 }

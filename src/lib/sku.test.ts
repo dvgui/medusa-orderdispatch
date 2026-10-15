@@ -1,36 +1,31 @@
 import { describe, expect, it } from "bun:test"
 
-import { odmSkuFor, resolveOdmSkus } from "./sku"
+import { matchOdmStockItem, odmCandidates } from "./sku"
 
-describe("resolveOdmSkus", () => {
-  const stock = ["KREL-RETATRUTIDE-10MG", "KREL-Bacteriostatic-Water-10ML", "LEGACY-SKU"]
+const results = [
+  { Sku: "KREL-RETATRUTIDE-10MG", StockItemId: "id-reta-10" },
+  { Sku: "KREL-RETATRUTIDE-10MG-KIT", StockItemId: "id-reta-kit" },
+  { Sku: "LEGACY-SKU", StockItemId: "id-legacy" },
+]
 
+describe("matchOdmStockItem", () => {
   it("finds ODM's company-prefixed stock item for a plain Medusa SKU", () => {
-    const { resolved, missing } = resolveOdmSkus(["RETATRUTIDE-10MG", "BACTERIOSTATIC-WATER-10ML"], stock, "KREL-")
-    expect(Object.fromEntries(resolved)).toEqual({
-      "RETATRUTIDE-10MG": "KREL-RETATRUTIDE-10MG",
-      "BACTERIOSTATIC-WATER-10ML": "KREL-Bacteriostatic-Water-10ML",
-    })
-    expect(missing).toEqual([])
+    expect(matchOdmStockItem("RETATRUTIDE-10MG", results, "KREL-")).toEqual({ Sku: "KREL-RETATRUTIDE-10MG", StockItemId: "id-reta-10" })
+  })
+
+  it("matches exactly, not by the search's contains", () => {
+    expect(matchOdmStockItem("RETATRUTIDE-10MG-KIT", results, "KREL-")?.StockItemId).toBe("id-reta-kit")
+    expect(matchOdmStockItem("RETATRUTIDE", results, "KREL-")).toBeUndefined()
   })
 
   it("prefers an exact match and never double-prefixes", () => {
-    expect(resolveOdmSkus(["LEGACY-SKU", "KREL-RETATRUTIDE-10MG"], stock, "KREL-").resolved).toEqual(
-      new Map([
-        ["LEGACY-SKU", "LEGACY-SKU"],
-        ["KREL-RETATRUTIDE-10MG", "KREL-RETATRUTIDE-10MG"],
-      ])
-    )
+    expect(matchOdmStockItem("LEGACY-SKU", results, "KREL-")?.StockItemId).toBe("id-legacy")
+    expect(matchOdmStockItem("krel-retatrutide-10mg", results, "KREL-")?.StockItemId).toBe("id-reta-10")
+    expect(odmCandidates("KREL-X", "KREL-")).toEqual(["KREL-X"])
   })
 
-  it("reports SKUs ODM doesn't stock under either form", () => {
-    expect(resolveOdmSkus(["TIRZEPATIDE-10MG"], stock, "KREL-").missing).toEqual(["TIRZEPATIDE-10MG"])
-    expect(resolveOdmSkus(["RETATRUTIDE-10MG"], stock, "").missing).toEqual(["RETATRUTIDE-10MG"])
-  })
-
-  it("prefixes when the stock list isn't consulted", () => {
-    expect(odmSkuFor("RETATRUTIDE-10MG", "KREL-")).toBe("KREL-RETATRUTIDE-10MG")
-    expect(odmSkuFor("KREL-RETATRUTIDE-10MG", "KREL-")).toBe("KREL-RETATRUTIDE-10MG")
-    expect(odmSkuFor("RETATRUTIDE-10MG", "")).toBe("RETATRUTIDE-10MG")
+  it("returns nothing without a prefix match or a StockItemId", () => {
+    expect(matchOdmStockItem("RETATRUTIDE-10MG", results, "")).toBeUndefined()
+    expect(matchOdmStockItem("X", [{ Sku: "X", StockItemId: "" }], "")).toBeUndefined()
   })
 })

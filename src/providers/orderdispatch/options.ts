@@ -16,15 +16,13 @@ export type OrderDispatchProviderOptions = Readonly<{
   /** ShippingDetails.ShippingService (default "StandardDelivery", as ODM's own
    *  Create Order screen sends); ODM's shipping rules pick the courier. */
   shippingService?: string
-  /** Refuse to push when a SKU is unknown to ODM (default true). */
-  checkSkus?: boolean
-  /** How long the ODM SKU list is cached for that check (default 5 min). */
+  /** How long a SKU → ODM stock item lookup is cached (default 5 min). */
   skuCacheMs?: number
   timeoutMs?: number
 }>
 
 export type ResolvedOrderDispatchOptions = OrderDispatchProviderOptions &
-  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "shippingService" | "checkSkus" | "skuCacheMs">>
+  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "shippingService" | "skuCacheMs">>
 
 export const resolveOrderDispatchOptions = (
   options: Partial<OrderDispatchProviderOptions> | undefined
@@ -45,7 +43,6 @@ export const resolveOrderDispatchOptions = (
     referencePrefix: options?.referencePrefix?.trim() ?? "",
     skuPrefix: options?.skuPrefix?.trim() ?? "",
     shippingService: options?.shippingService?.trim() || "StandardDelivery",
-    checkSkus: options?.checkSkus ?? true,
     skuCacheMs: options?.skuCacheMs ?? 5 * 60_000,
   }
 }
