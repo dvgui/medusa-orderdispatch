@@ -1,6 +1,9 @@
 import { AbstractFulfillmentProviderService, MedusaError } from "@medusajs/framework/utils"
 import type {
+  CalculatedShippingOptionPrice,
+  CalculateShippingOptionPriceContext,
   CreateFulfillmentResult,
+  CreateShippingOptionDTO,
   FulfillmentDTO,
   FulfillmentItemDTO,
   FulfillmentOption,
@@ -22,6 +25,8 @@ import {
 import { OrderDispatchClient, OrderDispatchError } from "../../lib/orderdispatch-client"
 import { odmCountryName } from "../../lib/country"
 import { matchOdmStockItem, type OdmStockItem } from "../../lib/sku"
+import { parcelWeightKg, pickRate, withMarkup } from "../../lib/rates"
+import type { ShippingRate } from "../../lib/orderdispatch-client/types"
 import {
   resolveOrderDispatchOptions,
   type OrderDispatchProviderOptions,
@@ -36,6 +41,10 @@ type InjectedDependencies = Readonly<{ logger: Logger }>
  * tracking come back through the `orderdispatch-tracking` job, which marks the
  * order shipped with `createOrderShipmentWorkflow`.
  */
+const optionFor = (id: unknown) => ORDERDISPATCH_FULFILLMENT_OPTIONS.find((option) => option.id === id) as
+  | (typeof ORDERDISPATCH_FULFILLMENT_OPTIONS)[number] & { rate?: { vendor: string; service: string; fallback?: string } }
+  | undefined
+
 class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService {
   static identifier = ORDERDISPATCH_IDENTIFIER
 
@@ -44,6 +53,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
   protected readonly client_: OrderDispatchClient
   readonly #stockItems = new Map<string, Readonly<{ item: OdmStockItem; fetchedAt: number }>>()
   #countries?: Readonly<{ names: readonly string[]; fetchedAt: number }>
+  readonly #rates = new Map<string, Readonly<{ rates: readonly ShippingRate[]; fetchedAt: number }>>()
 
   static validateOptions(options: Record<string, unknown>): void {
     resolveOrderDispatchOptions(options as Partial<OrderDispatchProviderOptions>)
@@ -57,7 +67,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
   }
 
   async getFulfillmentOptions(): Promise<FulfillmentOption[]> {
-    return ORDERDISPATCH_FULFILLMENT_OPTIONS.map((option) => ({ ...option }))
+    return ORDERDISPATCH_FULFILLMENT_OPTIONS.map(({ id, name }) => ({ id, name }))
   }
 
   async validateFulfillmentData(
@@ -71,8 +81,37 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
     return ORDERDISPATCH_FULFILLMENT_OPTIONS.some((option) => option.id === data.id)
   }
 
-  async canCalculate(): Promise<boolean> {
-    return false
+  /** The international options are priced live from ODM's DDP rates. */
+  async canCalculate(option: CreateShippingOptionDTO): Promise<boolean> {
+    return Boolean(optionFor((option.data as Record<string, unknown> | undefined)?.id)?.rate)
+  }
+
+  /**
+   * ODM's DDP rate for the delivery country and parcel weight, plus the
+   * markup. GBP and tax-exclusive, like the store's flat options.
+   */
+  async calculatePrice(
+    optionData: Record<string, unknown>,
+    _data: Record<string, unknown>,
+    context: CalculateShippingOptionPriceContext
+  ): Promise<CalculatedShippingOptionPrice> {
+    const option = optionFor(optionData.id)
+    if (!option?.rate) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, `OrderDispatch option ${String(optionData.id)} has a flat price`)
+    }
+    const country = context.shipping_address?.country_code?.trim().toUpperCase()
+    if (!country) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Enter a delivery address to see the shipping price")
+    }
+    const kg = parcelWeightKg(context.items as never, this.options_.packagingGrams)
+    const rate = pickRate(await this.#ratesFor(country, kg), option.rate)
+    if (!rate) {
+      throw new MedusaError(MedusaError.Types.NOT_ALLOWED, `${option.name} doesn't deliver to ${country}`)
+    }
+    return {
+      calculated_amount: withMarkup(rate.Price, this.options_.rateMarkupPercent),
+      is_calculated_price_tax_inclusive: false,
+    }
   }
 
   async createFulfillment(
@@ -97,7 +136,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         items: items as ProviderFulfillmentItem[],
         resendClaimId: typeof resendClaimId === "string" ? resendClaimId : null,
         referencePrefix: this.options_.referencePrefix,
-        shippingService: this.options_.shippingService,
+        shippingService: optionFor(data.id)?.shippingService ?? this.options_.shippingService,
       })
       const stockItems = await this.#resolveStockItems(built.request.OrderItems.map((line) => line.Sku))
       const request = {
@@ -156,6 +195,16 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
       MedusaError.Types.NOT_ALLOWED,
       "OrderDispatch returns go through the OrderDispatch returns portal, not Medusa"
     )
+  }
+
+  /** ODM's rates for a country and weight, cached so checkout doesn't hammer ODM. */
+  async #ratesFor(country: string, kg: number): Promise<readonly ShippingRate[]> {
+    const key = `${country}:${kg}`
+    const cached = this.#rates.get(key)
+    if (cached && Date.now() - cached.fetchedAt <= this.options_.rateCacheMs) return cached.rates
+    const rates = await this.client_.getShippingRates(country, kg)
+    this.#rates.set(key, { rates, fetchedAt: Date.now() })
+    return rates
   }
 
   /** ODM's country name for an ISO code (its list is cached for a day). */

@@ -46,7 +46,8 @@ describe("OrderDispatchFulfillmentService", () => {
     expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", StockItemId: "si-1", Weight: 0.11 })
     // ODM takes its own country NAME, not the ISO code.
     expect(body.DeliveryAddress.Country).toBe("Germany")
-    expect(body.ShippingDetails.ShippingService).toBe("StandardDelivery")
+    // Each option sends the label ODM's shipping rules map to a courier service.
+    expect(body.ShippingDetails.ShippingService).toBe("DHL Economy DDP")
   })
 
   it("sends the company-prefixed stock item ODM holds", async () => {
@@ -96,9 +97,45 @@ describe("OrderDispatchFulfillmentService", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 
-  it("offers the two options and marks a cancel for follow-up", async () => {
+  it("prices the international options live: ODM's DDP rate + markup", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(answer({ token: jwt }))
+      .mockResolvedValueOnce(
+        answer({
+          Country: "DE",
+          Weight: 0.27,
+          Rates: [
+            { Vendor: "DHL Express", Name: "Economy Select International DDP", Price: 15.98 },
+            { Vendor: "DHL Express", Name: "Express Worldwide DDP", Price: 31.83 },
+          ],
+        })
+      )
     const service = make()
-    expect((await service.getFulfillmentOptions()).map((o) => o.id)).toEqual(["od-uk", "od-intl"])
+    const context = { shipping_address: { country_code: "de" }, items: [{ quantity: 2, variant: { weight: 110 } }] } as never
+    expect(await service.calculatePrice({ id: "od-intl-economy" }, {}, context)).toEqual({
+      calculated_amount: 19.18,
+      is_calculated_price_tax_inclusive: false,
+    })
+    // Same country and weight: served from the cache, no second ODM call.
+    expect((await service.calculatePrice({ id: "od-intl-express" }, {}, context)).calculated_amount).toBe(38.2)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const ratesCall = fetchSpy.mock.calls[1] as [URL, RequestInit]
+    expect(ratesCall[0].searchParams.get("country")).toBe("DE")
+    expect(ratesCall[0].searchParams.get("weight")).toBe("0.27") // 2 × 110 g + 50 g packaging
+  })
+
+  it("calculates only the international options and needs an address", async () => {
+    const service = make()
+    expect(await service.canCalculate({ data: { id: "od-intl-express" } } as never)).toBe(true)
+    expect(await service.canCalculate({ data: { id: "od-uk" } } as never)).toBe(false)
+    await expect(service.calculatePrice({ id: "od-intl-economy" }, {}, { items: [] } as never)).rejects.toThrow(
+      "Enter a delivery address"
+    )
+  })
+
+  it("offers UK, Economy and Express and marks a cancel for follow-up", async () => {
+    const service = make()
+    expect((await service.getFulfillmentOptions()).map((o) => o.id)).toEqual(["od-uk", "od-intl-economy", "od-intl-express", "od-intl"])
     expect(await service.validateOption({ id: "od-uk" })).toBe(true)
     expect(await service.validateOption({ id: "rm-signed-for-1st" })).toBe(false)
     expect(await service.cancelFulfillment({ odOrderNumber: "9001" })).toMatchObject({ odCancelRequested: true })

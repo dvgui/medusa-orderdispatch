@@ -18,13 +18,20 @@ export type OrderDispatchProviderOptions = Readonly<{
   /** ShippingDetails.ShippingService (default "StandardDelivery", as ODM's own
    *  Create Order screen sends); ODM's shipping rules pick the courier. */
   shippingService?: string
+  /** Markup on ODM's DDP rate for the live-priced international options
+   *  (default 20, i.e. +20%). */
+  rateMarkupPercent?: number
+  /** Packaging added to the cart's variant weights when pricing (default 50 g). */
+  packagingGrams?: number
+  /** How long a country + weight rate quote is cached (default 1 h). */
+  rateCacheMs?: number
   /** How long a SKU → ODM stock item lookup is cached (default 5 min). */
   skuCacheMs?: number
   timeoutMs?: number
 }>
 
 export type ResolvedOrderDispatchOptions = OrderDispatchProviderOptions &
-  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "shippingService" | "skuCacheMs">>
+  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "shippingService" | "skuCacheMs" | "rateMarkupPercent" | "packagingGrams" | "rateCacheMs">>
 
 export const resolveOrderDispatchOptions = (
   options: Partial<OrderDispatchProviderOptions> | undefined
@@ -46,5 +53,8 @@ export const resolveOrderDispatchOptions = (
     skuPrefix: options?.skuPrefix?.trim() ?? "",
     shippingService: options?.shippingService?.trim() || "StandardDelivery",
     skuCacheMs: options?.skuCacheMs ?? 5 * 60_000,
+    rateMarkupPercent: Number.isFinite(Number(options?.rateMarkupPercent)) ? Number(options?.rateMarkupPercent) : 20,
+    packagingGrams: Number.isFinite(Number(options?.packagingGrams)) ? Number(options?.packagingGrams) : 50,
+    rateCacheMs: options?.rateCacheMs ?? 60 * 60_000,
   }
 }

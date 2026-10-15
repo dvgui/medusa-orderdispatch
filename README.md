@@ -76,7 +76,22 @@ modules: [{
 - `ORDERDISPATCH_USERNAME`, `ORDERDISPATCH_PASSWORD`
 - optional `ORDERDISPATCH_BASE_URL`
 
-The provider id is `orderdispatch-fulfillment_orderdispatch-fulfillment`. Its fulfillment options are `od-uk` and `od-intl`.
+The provider id is `orderdispatch-fulfillment_orderdispatch-fulfillment`. Its fulfillment options:
+
+| Option | ShippingService sent to ODM | Price |
+| --- | --- | --- |
+| `od-uk` | `UK Tracked 24` | flat (set on the shipping option) |
+| `od-intl-economy` | `DHL Economy DDP` | **calculated**: ODM's `Economy Select International DDP` rate (falls back to `Express Worldwide DDP` where Economy isn't offered, e.g. the US) + `rateMarkupPercent` (default 20) |
+| `od-intl-express` | `DHL Express DDP` | **calculated**: ODM's `Express Worldwide DDP` rate + markup |
+| `od-intl` (legacy) | `DHL Economy DDP` | flat |
+
+ODM's shipping rules (Settings → Shipping Service Settings → Shipping Service Conditions) map the `ShippingService` labels to the actual courier services.
+
+Calculated prices:
+- **Weight:** the cart's variant weights (g → kg) plus `packagingGrams` (default 50).
+- **Currency:** GBP.
+- **Tax:** tax-exclusive.
+- **Caching:** quotes are cached `rateCacheMs` (default 1 h) per country and weight.
 
 ## Release
 

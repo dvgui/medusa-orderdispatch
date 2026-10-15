@@ -9,11 +9,27 @@ export const ORDERDISPATCH_PROVIDER_ID = `${ORDERDISPATCH_IDENTIFIER}_${ORDERDIS
 
 export const ORDERDISPATCH_DEFAULT_BASE_URL = "https://www.orderdispatch.co.uk"
 
-/** OrderDispatch picks the courier through its shipping rules; Medusa only
- *  says whether the parcel is domestic or international. */
+/**
+ * Medusa's fulfillment options. Each sends ODM a ShippingService label that
+ * ODM's shipping rules (Settings → Shipping Service Settings) map to the real
+ * courier service. The international ones are priced live from ODM's DDP rates.
+ */
 export const ORDERDISPATCH_FULFILLMENT_OPTIONS = [
-  { id: "od-uk", name: "OrderDispatch UK" },
-  { id: "od-intl", name: "OrderDispatch International" },
+  { id: "od-uk", name: "OrderDispatch UK", shippingService: "UK Tracked 24" },
+  {
+    id: "od-intl-economy",
+    name: "OrderDispatch International Economy",
+    shippingService: "DHL Economy DDP",
+    rate: { vendor: "DHL Express", service: "Economy Select International DDP", fallback: "Express Worldwide DDP" },
+  },
+  {
+    id: "od-intl-express",
+    name: "OrderDispatch International Express",
+    shippingService: "DHL Express DDP",
+    rate: { vendor: "DHL Express", service: "Express Worldwide DDP" },
+  },
+  /** Before the Economy/Express split; shipped as Economy. */
+  { id: "od-intl", name: "OrderDispatch International", shippingService: "DHL Economy DDP" },
 ] as const
 
 export type OrderDispatchOptionId = (typeof ORDERDISPATCH_FULFILLMENT_OPTIONS)[number]["id"]
