@@ -27,26 +27,30 @@ export type CreateOrderItem = Readonly<{
   DiscountAmount?: number
 }>
 
+/**
+ * Every field is sent, empty when unknown: ODM's own Create Order screen sends
+ * them all, and a missing one fails server-side with a .NET null reference.
+ */
 export type DeliveryAddress = Readonly<{
   FullName: string
-  Email?: string
-  Phone?: string
-  Company?: string
+  Email: string
+  Phone: string
+  Company: string
   Address1: string
-  Address2?: string
-  Address3?: string
+  Address2: string
+  Address3: string
   Town: string
+  Region: string
   PostCode: string
-  Region?: string
-  /** ISO 3166-1 alpha-2, e.g. "GB". */
+  /** ODM's country NAME from GET /api/CreateOrder/GetCountries ("United Kingdom"). */
   Country: string
 }>
 
 export type BillingAddress = Omit<DeliveryAddress, "Email" | "Address3">
 
 export type ShippingDetails = Readonly<{
-  /** Empty lets ODM's shipping rules choose the courier. */
-  ShippingService?: string
+  /** ODM's screen sends "StandardDelivery"; ODM's shipping rules pick the courier. */
+  ShippingService: string
   ReferenceNumber: string
   ShippingCost?: number
 }>
@@ -71,6 +75,9 @@ export type CreateOrderResponse = Readonly<{
   ShippingScriptExecutedSuccessfully?: boolean
   Error?: string | null
 }>
+
+/** GET /api/CreateOrder/GetCountries — country names, e.g. "United Kingdom". */
+export type CountriesResponse = readonly string[]
 
 /** GET /api/InventoryPreview/GetStockLevels */
 export type StockLevel = Readonly<{

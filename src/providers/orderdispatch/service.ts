@@ -20,6 +20,7 @@ import {
   type ProviderOrder,
 } from "../../lib/build-order"
 import { OrderDispatchClient, OrderDispatchError } from "../../lib/orderdispatch-client"
+import { odmCountryName } from "../../lib/country"
 import { odmSkuFor, resolveOdmSkus } from "../../lib/sku"
 import {
   resolveOrderDispatchOptions,
@@ -42,6 +43,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
   protected readonly options_: ResolvedOrderDispatchOptions
   protected readonly client_: OrderDispatchClient
   #stockItems?: Readonly<{ itemNumbers: readonly string[]; fetchedAt: number }>
+  #countries?: Readonly<{ names: readonly string[]; fetchedAt: number }>
 
   static validateOptions(options: Record<string, unknown>): void {
     resolveOrderDispatchOptions(options as Partial<OrderDispatchProviderOptions>)
@@ -95,11 +97,16 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         items: items as ProviderFulfillmentItem[],
         resendClaimId: typeof resendClaimId === "string" ? resendClaimId : null,
         referencePrefix: this.options_.referencePrefix,
+        shippingService: this.options_.shippingService,
       })
       const odmSku = await this.#resolveSkus(built.request.OrderItems.map((line) => line.Sku))
       const request = {
         ...built.request,
         OrderItems: built.request.OrderItems.map((line) => ({ ...line, Sku: odmSku.get(line.Sku) ?? line.Sku })),
+        DeliveryAddress: {
+          ...built.request.DeliveryAddress,
+          Country: await this.#countryName(built.request.DeliveryAddress.Country),
+        },
       }
 
       const created = await this.client_.createOrder(request, {
@@ -146,6 +153,17 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
       MedusaError.Types.NOT_ALLOWED,
       "OrderDispatch returns go through the OrderDispatch returns portal, not Medusa"
     )
+  }
+
+  /** ODM's country name for an ISO code (its list is cached for a day). */
+  async #countryName(iso2: string): Promise<string> {
+    const now = Date.now()
+    if (!this.#countries || now - this.#countries.fetchedAt > 24 * 60 * 60_000) {
+      this.#countries = { names: await this.client_.getCountries(), fetchedAt: now }
+    }
+    const name = odmCountryName(iso2, this.#countries.names)
+    if (!name) throw new OrderBuildError(`OrderDispatch doesn't list the delivery country ${iso2}`)
+    return name
   }
 
   /**

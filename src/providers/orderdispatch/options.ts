@@ -13,6 +13,9 @@ export type OrderDispatchProviderOptions = Readonly<{
   /** ODM's company prefix on stock item SKUs (e.g. "KREL-"); Medusa SKUs stay
    *  plain and are sent as the stock item ODM actually holds. */
   skuPrefix?: string
+  /** ShippingDetails.ShippingService (default "StandardDelivery", as ODM's own
+   *  Create Order screen sends); ODM's shipping rules pick the courier. */
+  shippingService?: string
   /** Refuse to push when a SKU is unknown to ODM (default true). */
   checkSkus?: boolean
   /** How long the ODM SKU list is cached for that check (default 5 min). */
@@ -21,7 +24,7 @@ export type OrderDispatchProviderOptions = Readonly<{
 }>
 
 export type ResolvedOrderDispatchOptions = OrderDispatchProviderOptions &
-  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "checkSkus" | "skuCacheMs">>
+  Required<Pick<OrderDispatchProviderOptions, "source" | "referencePrefix" | "skuPrefix" | "shippingService" | "checkSkus" | "skuCacheMs">>
 
 export const resolveOrderDispatchOptions = (
   options: Partial<OrderDispatchProviderOptions> | undefined
@@ -41,6 +44,7 @@ export const resolveOrderDispatchOptions = (
     source: options?.source?.trim() || "MEDUSA",
     referencePrefix: options?.referencePrefix?.trim() ?? "",
     skuPrefix: options?.skuPrefix?.trim() ?? "",
+    shippingService: options?.shippingService?.trim() || "StandardDelivery",
     checkSkus: options?.checkSkus ?? true,
     skuCacheMs: options?.skuCacheMs ?? 5 * 60_000,
   }

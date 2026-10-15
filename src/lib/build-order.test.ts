@@ -36,7 +36,7 @@ describe("buildOrderDispatchOrder", () => {
     const { reference, subSource, request } = buildOrderDispatchOrder({ order, items })
     expect(reference).toBe("1201")
     expect(subSource).toBe("peppys_uk")
-    expect(request.ShippingDetails).toEqual({ ReferenceNumber: "1201", ShippingCost: 4 })
+    expect(request.ShippingDetails).toEqual({ ShippingService: "StandardDelivery", ReferenceNumber: "1201", ShippingCost: 4 })
     expect(request.Currency).toBe("GBP")
     expect(request.OrderDate).toBe("2026-10-14T09:00:00.000Z")
     expect(request.DeliveryAddress).toMatchObject({
@@ -45,7 +45,10 @@ describe("buildOrderDispatchOrder", () => {
       Country: "GB",
       PostCode: "SW1A 2AA",
     })
-    expect(request.BillingAddress).not.toHaveProperty("Email")
+    // ODM fails on missing fields: every address field is a string, no billing address.
+    expect(Object.values(request.DeliveryAddress).every((v) => typeof v === "string")).toBe(true)
+    expect(request.DeliveryAddress).toMatchObject({ Company: "", Address2: "", Address3: "", Region: "" })
+    expect(request).not.toHaveProperty("BillingAddress")
     expect(request.OrderItems).toEqual([
       { Sku: "RETATRUTIDE-10MG", Title: "Retatrutide 10mg", Quantity: 2, RetailPrice: 77, DiscountAmount: 7.7, Weight: 0.11, LineItemId: "li_1" },
       { Sku: "BACTERIOSTATIC-WATER-10ML", Title: "Bacteriostatic Water 10ml", Quantity: 1, RetailPrice: 6, DiscountAmount: 0, LineItemId: "li_2" },

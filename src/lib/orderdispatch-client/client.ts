@@ -1,5 +1,6 @@
 import { ORDERDISPATCH_DEFAULT_BASE_URL } from "../../constants"
 import type {
+  CountriesResponse,
   CreateOrderRequest,
   CreateOrderResponse,
   OrderDispatchCredentials,
@@ -100,6 +101,12 @@ export class OrderDispatchClient {
     const response = await this.#request<ProcessedOrderResponse>("GET", "/api/ProcessedOrders/GetProcessedOrders")
     if (!response.Success) throw new OrderDispatchError("OrderDispatch GetProcessedOrders was not successful")
     return response.ProcessedOrders ?? []
+  }
+
+  /** ODM's country names; CreateOrder's Country must be one of them. */
+  async getCountries(): Promise<readonly string[]> {
+    const response = await this.#request<CountriesResponse>("GET", "/api/CreateOrder/GetCountries")
+    return Array.isArray(response) ? response : []
   }
 
   /** `weightKg` per ODM: kilograms. */

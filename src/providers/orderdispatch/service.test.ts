@@ -34,26 +34,44 @@ describe("OrderDispatchFulfillmentService", () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
       .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer(["United Kingdom", "Germany"]))
       .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9001" }))
 
     const result = await make().createFulfillment({ id: "od-intl" }, items, order, { metadata: {} } as never)
 
     expect(result.data).toMatchObject({ id: "od-intl", odOrderNumber: "9001", odReference: "1201", odSubSource: "buyreta_eu" })
-    const createCall = fetchSpy.mock.calls[2] as [URL, RequestInit]
+    const createCall = fetchSpy.mock.calls[3] as [URL, RequestInit]
     expect(createCall[0].searchParams.get("subSource")).toBe("buyreta_eu")
-    expect(JSON.parse(String(createCall[1].body)).OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", Weight: 0.11 })
+    const body = JSON.parse(String(createCall[1].body))
+    expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", Weight: 0.11 })
+    // ODM takes its own country NAME, not the ISO code.
+    expect(body.DeliveryAddress.Country).toBe("Germany")
+    expect(body.ShippingDetails.ShippingService).toBe("StandardDelivery")
   })
 
   it("sends the company-prefixed stock item ODM holds", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))
       .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "KREL-RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer(["Germany"]))
       .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9002" }))
 
     await make({ skuPrefix: "KREL-" }).createFulfillment({}, items, order, { metadata: {} } as never)
 
-    const createCall = fetchSpy.mock.calls[2] as [URL, RequestInit]
+    const createCall = fetchSpy.mock.calls[3] as [URL, RequestInit]
     expect(JSON.parse(String(createCall[1].body)).OrderItems[0].Sku).toBe("KREL-RETATRUTIDE-10MG")
+  })
+
+  it("refuses a delivery country ODM doesn't list, before creating anything", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(answer({ token: jwt }))
+      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer(["United Kingdom"]))
+
+    await expect(make().createFulfillment({}, items, order, { metadata: {} } as never)).rejects.toThrow(
+      "OrderDispatch doesn't list the delivery country DE"
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
   it("does not push twice when the fulfillment already has an ODM order", async () => {

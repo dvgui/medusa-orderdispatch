@@ -14,6 +14,11 @@ shipped (with tracking) once ODM dispatches it.
   - Each line's `Sku` is the fulfillment line's SKU, which Medusa copies from the **inventory item's `sku`**. Every physical product must therefore have one inventory item named by its warehouse SKU.
   - Before pushing, every SKU is checked against ODM's stock list (cached 5 min). An unknown SKU fails the fulfilment with a clear message instead of creating an unpickable ODM order.
   - ODM prefixes each client's stock items with a company code (`KREL-`). With `skuPrefix`, a plain Medusa SKU resolves to the stock item ODM holds (plain first, then prefixed), and the order line carries that exact SKU.
+  - The request matches what ODM's own Create Order screen sends, because its API fails with a .NET null reference on anything else:
+    - every DeliveryAddress field is a string (empty when unknown)
+    - no BillingAddress
+    - `ShippingService: "StandardDelivery"` (option `shippingService`; ODM's shipping rules pick the courier)
+    - `Country` is ODM's country **name** from `GET /api/CreateOrder/GetCountries`, not the ISO code (see `src/lib/country.ts` for the names ODM spells differently)
   - Idempotent: a fulfillment that already has `data.odOrderNumber` is never pushed again.
 - **Dispatch — `orderdispatch-tracking` job** (every 15 min)
   - Queries open fulfillments of this provider and fetches `GetProcessedOrders`.

@@ -135,16 +135,19 @@ const deliveryAddress = (order: ProviderOrder): DeliveryAddress => {
   if (missing.length) {
     throw new OrderBuildError(`Shipping address is missing ${missing.join(", ")}`)
   }
+  // Every field, empty when unknown (see DeliveryAddress). Country stays the
+  // ISO code here; the provider swaps in ODM's country name.
   return {
     FullName: fullName,
-    Email: text(order.email) || undefined,
-    Phone: text(a?.phone) || undefined,
-    Company: text(a?.company) || undefined,
+    Email: text(order.email),
+    Phone: text(a?.phone),
+    Company: text(a?.company),
     Address1: text(a?.address_1),
-    Address2: text(a?.address_2) || undefined,
+    Address2: text(a?.address_2),
+    Address3: "",
     Town: text(a?.city),
+    Region: text(a?.province),
     PostCode: text(a?.postal_code),
-    Region: text(a?.province) || undefined,
     Country: text(a?.country_code).toUpperCase(),
   }
 }
@@ -163,11 +166,15 @@ export const buildOrderDispatchOrder = ({
   items,
   resendClaimId,
   referencePrefix = "",
+  shippingService = "StandardDelivery",
 }: Readonly<{
   order: ProviderOrder
   items: readonly ProviderFulfillmentItem[]
   resendClaimId?: string | null
   referencePrefix?: string
+  /** ODM's own Create Order screen sends "StandardDelivery"; its shipping
+   *  rules then pick the courier. */
+  shippingService?: string
 }>): BuiltOrder => {
   if (!items.length) throw new OrderBuildError("Fulfillment has no items")
   const orderItems = new Map((order.items ?? []).map((i) => [i.id, i]))
@@ -202,7 +209,6 @@ export const buildOrderDispatchOrder = ({
 
   const reference = orderReference(order, resendClaimId, referencePrefix)
   const address = deliveryAddress(order)
-  const { Email: _email, Address3: _address3, ...billing } = address
   const subSource = text(order.metadata?.storefront) || "unknown"
   const createdAt = order.created_at ? new Date(order.created_at) : undefined
 
@@ -211,11 +217,10 @@ export const buildOrderDispatchOrder = ({
     subSource,
     request: {
       OrderItems: lines,
+      // No BillingAddress: ODM's own Create Order screen doesn't send one.
       DeliveryAddress: address,
-      // The provider is not given the billing address; ODM only needs one for
-      // its records, and the parcel goes to the delivery address.
-      BillingAddress: billing,
       ShippingDetails: {
+        ShippingService: shippingService,
         ReferenceNumber: reference,
         ShippingCost: isResend ? 0 : money(order.shipping_total),
       },
