@@ -42,7 +42,10 @@ type InjectedDependencies = Readonly<{ logger: Logger }>
  * order shipped with `createOrderShipmentWorkflow`.
  */
 const optionFor = (id: unknown) => ORDERDISPATCH_FULFILLMENT_OPTIONS.find((option) => option.id === id) as
-  | (typeof ORDERDISPATCH_FULFILLMENT_OPTIONS)[number] & { rate?: { vendor: string; service: string; fallback?: string } }
+  | (typeof ORDERDISPATCH_FULFILLMENT_OPTIONS)[number] & {
+      rate?: { vendor: string; service: string; fallback?: string }
+      subSourceSuffix?: string
+    }
   | undefined
 
 class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService {
@@ -136,7 +139,7 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         items: items as ProviderFulfillmentItem[],
         resendClaimId: typeof resendClaimId === "string" ? resendClaimId : null,
         referencePrefix: this.options_.referencePrefix,
-        shippingService: optionFor(data.id)?.shippingService ?? this.options_.shippingService,
+        shippingService: this.options_.shippingService,
       })
       const stockItems = await this.#resolveStockItems(built.request.OrderItems.map((line) => line.Sku))
       const request = {
@@ -151,17 +154,16 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         },
       }
 
-      const created = await this.client_.createOrder(request, {
-        source: this.options_.source,
-        subSource: built.subSource,
-      })
+      // ODM's rules read the customer's Express choice from the SubSource.
+      const subSource = `${built.subSource}${optionFor(data.id)?.subSourceSuffix ?? ""}`
+      const created = await this.client_.createOrder(request, { source: this.options_.source, subSource })
       this.logger_.info(
-        `[orderdispatch] pushed ${built.reference} (${built.subSource}) as ODM order ${created.OrderNumber}`
+        `[orderdispatch] pushed ${built.reference} (${subSource}) as ODM order ${created.OrderNumber}`
       )
       const pushed: OrderDispatchFulfillmentData = {
         odOrderNumber: created.OrderNumber,
         odReference: built.reference,
-        odSubSource: built.subSource,
+        odSubSource: subSource,
         odPushedAt: new Date().toISOString(),
       }
       return { data: { ...data, ...pushed }, labels: [] }

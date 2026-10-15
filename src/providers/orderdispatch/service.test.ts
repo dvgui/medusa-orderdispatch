@@ -46,8 +46,8 @@ describe("OrderDispatchFulfillmentService", () => {
     expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", StockItemId: "si-1", Weight: 0.11 })
     // ODM takes its own country NAME, not the ISO code.
     expect(body.DeliveryAddress.Country).toBe("Germany")
-    // Each option sends the label ODM's shipping rules map to a courier service.
-    expect(body.ShippingDetails.ShippingService).toBe("DHL Economy DDP")
+    // ODM ignores ShippingService; its own screen sends "StandardDelivery".
+    expect(body.ShippingDetails.ShippingService).toBe("StandardDelivery")
   })
 
   it("sends the company-prefixed stock item ODM holds", async () => {
@@ -77,6 +77,20 @@ describe("OrderDispatchFulfillmentService", () => {
       "OrderDispatch doesn't list the delivery country DE"
     )
     expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it("tags Express orders in the SubSource for ODM's shipping rules", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(answer({ token: jwt }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-1", Sku: "RETATRUTIDE-10MG" }]))
+      .mockResolvedValueOnce(answer(["Germany"]))
+      .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9003" }))
+
+    const result = await make().createFulfillment({ id: "od-intl-express" }, items, order, { metadata: {} } as never)
+
+    const createCall = fetchSpy.mock.calls[3] as [URL, RequestInit]
+    expect(createCall[0].searchParams.get("subSource")).toBe("buyreta_eu-express")
+    expect(result.data).toMatchObject({ odSubSource: "buyreta_eu-express" })
   })
 
   it("does not push twice when the fulfillment already has an ODM order", async () => {

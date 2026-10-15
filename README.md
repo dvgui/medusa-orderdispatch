@@ -78,14 +78,20 @@ modules: [{
 
 The provider id is `orderdispatch-fulfillment_orderdispatch-fulfillment`. Its fulfillment options:
 
-| Option | ShippingService sent to ODM | Price |
+| Option | SubSource sent to ODM | Price |
 | --- | --- | --- |
-| `od-uk` | `UK Tracked 24` | flat (set on the shipping option) |
-| `od-intl-economy` | `DHL Economy DDP` | **calculated**: ODM's `Economy Select International DDP` rate (falls back to `Express Worldwide DDP` where Economy isn't offered, e.g. the US) + `rateMarkupPercent` (default 20) |
-| `od-intl-express` | `DHL Express DDP` | **calculated**: ODM's `Express Worldwide DDP` rate + markup |
-| `od-intl` (legacy) | `DHL Economy DDP` | flat |
+| `od-uk` | `<storefront>` | flat (set on the shipping option) |
+| `od-intl-economy` | `<storefront>` | **calculated**: ODM's `Economy Select International DDP` rate (falls back to `Express Worldwide DDP` where Economy isn't offered, e.g. the US) + `rateMarkupPercent` (default 20) |
+| `od-intl-express` | `<storefront>-express` | **calculated**: ODM's `Express Worldwide DDP` rate + markup |
+| `od-intl` (legacy) | `<storefront>` | flat |
 
-ODM's shipping rules (Settings → Shipping Service Settings → Shipping Service Conditions) map the `ShippingService` labels to the actual courier services.
+**ODM ignores `ShippingDetails.ShippingService`** (verified 2026-10-15): the plugin sends `"StandardDelivery"` like ODM's own screen. The customer's Express choice reaches ODM's shipping rules (Settings → Shipping Service Settings → Shipping Service Conditions) through the `-express` SubSource suffix:
+1. Country = United Kingdom → Royal Mail Tracked 24 NEXT DAY
+2. Sub Source ends with `-express` → Express Worldwide DDP
+3. Country in DHL Economy's list → Economy Select International DDP
+4. Any other country → Express Worldwide DDP
+
+Rules saved through the API only take effect after the dashboard's own Save has stored the account's selected services once.
 
 Calculated prices:
 - **Weight:** the cart's variant weights (g → kg) plus `packagingGrams` (default 50).
