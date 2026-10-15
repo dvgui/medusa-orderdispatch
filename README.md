@@ -13,6 +13,7 @@ shipped (with tracking) once ODM dispatches it.
   - `source` comes from the provider options (default `MEDUSA`); `subSource` is `order.metadata.storefront`.
   - Each line's `Sku` is the fulfillment line's SKU, which Medusa copies from the **inventory item's `sku`**. Every physical product must therefore have one inventory item named by its warehouse SKU.
   - Before pushing, every SKU is checked against ODM's stock list (cached 5 min). An unknown SKU fails the fulfilment with a clear message instead of creating an unpickable ODM order.
+  - ODM prefixes each client's stock items with a company code (`KREL-`). With `skuPrefix`, a plain Medusa SKU resolves to the stock item ODM holds (plain first, then prefixed), and the order line carries that exact SKU.
   - Idempotent: a fulfillment that already has `data.odOrderNumber` is never pushed again.
 - **Dispatch — `orderdispatch-tracking` job** (every 15 min)
   - Queries open fulfillments of this provider and fetches `GetProcessedOrders`.
@@ -53,6 +54,8 @@ modules: [{
       source: process.env.ORDERDISPATCH_SOURCE, // default MEDUSA
       // Environments sharing one ODM account must not share references:
       referencePrefix: process.env.ORDERDISPATCH_REFERENCE_PREFIX, // e.g. "DEV-" on dev
+      // ODM prefixes each client's stock items ("KREL-…"); Medusa SKUs stay plain:
+      skuPrefix: process.env.ORDERDISPATCH_SKU_PREFIX, // e.g. "KREL-"
     },
   }] },
 }]

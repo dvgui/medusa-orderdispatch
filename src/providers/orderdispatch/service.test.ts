@@ -44,6 +44,18 @@ describe("OrderDispatchFulfillmentService", () => {
     expect(JSON.parse(String(createCall[1].body)).OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", Weight: 0.11 })
   })
 
+  it("sends the company-prefixed stock item ODM holds", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(answer({ token: jwt }))
+      .mockResolvedValueOnce(answer({ Success: true, StockLevels: [{ ItemNumber: "KREL-RETATRUTIDE-10MG", Available: 5, InStock: 5, InOrders: 0 }] }))
+      .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9002" }))
+
+    await make({ skuPrefix: "KREL-" }).createFulfillment({}, items, order, { metadata: {} } as never)
+
+    const createCall = fetchSpy.mock.calls[2] as [URL, RequestInit]
+    expect(JSON.parse(String(createCall[1].body)).OrderItems[0].Sku).toBe("KREL-RETATRUTIDE-10MG")
+  })
+
   it("does not push twice when the fulfillment already has an ODM order", async () => {
     const data = { odOrderNumber: "9001", odReference: "1201" }
     const result = await make().createFulfillment(data, items, order, {} as never)
