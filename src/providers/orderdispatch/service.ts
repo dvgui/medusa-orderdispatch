@@ -146,7 +146,14 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
         ...built.request,
         OrderItems: built.request.OrderItems.map((line) => {
           const stockItem = stockItems.get(line.Sku)!
-          return { ...line, Sku: stockItem.Sku, StockItemId: stockItem.StockItemId }
+          // The warehouse picks by ODM's own item name, so the line carries it
+          // (some items are named by warehouse code, e.g. "TR10", not by product).
+          return {
+            ...line,
+            Sku: stockItem.Sku,
+            StockItemId: stockItem.StockItemId,
+            Title: stockItem.Title?.trim() || line.Title,
+          }
         }),
         DeliveryAddress: {
           ...built.request.DeliveryAddress,

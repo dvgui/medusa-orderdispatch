@@ -30,6 +30,19 @@ describe("OrderDispatchFulfillmentService", () => {
   const make = (opts: Record<string, unknown> = {}) =>
     new OrderDispatchFulfillmentService({ logger }, { username: "api@x", password: "pw", ...opts })
 
+  it("names each line by ODM's own item title, falling back to the order's", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(answer({ token: jwt }))
+      .mockResolvedValueOnce(answer([{ StockItemId: "si-1", Sku: "RETATRUTIDE-10MG", Title: " RT10 " }]))
+      .mockResolvedValueOnce(answer(["United Kingdom", "Germany"]))
+      .mockResolvedValueOnce(answer({ IsSuccessfull: true, OrderNumber: "9002" }))
+
+    await make().createFulfillment({ id: "od-intl" }, items, order, { metadata: {} } as never)
+
+    const body = JSON.parse(String((fetchSpy.mock.calls[3] as [URL, RequestInit])[1].body))
+    expect(body.OrderItems[0]).toMatchObject({ Sku: "RETATRUTIDE-10MG", Title: "RT10" })
+  })
+
   it("pushes the order with the storefront as subSource and stores ODM's order number", async () => {
     fetchSpy
       .mockResolvedValueOnce(answer({ token: jwt }))

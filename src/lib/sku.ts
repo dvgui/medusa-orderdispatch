@@ -12,7 +12,12 @@ export const odmCandidates = (sku: string, prefix: string): string[] => {
   return prefixed ? [plain, prefixed] : [plain]
 }
 
-export type OdmStockItem = Readonly<{ Sku: string; StockItemId: string }>
+export type OdmStockItem = Readonly<{
+  Sku: string
+  StockItemId: string
+  /** ODM's own name for the item, e.g. a warehouse code like "TR10". */
+  Title?: string | null
+}>
 
 /** The stock item for one Medusa SKU among ODM search results, if any. */
 export const matchOdmStockItem = (
