@@ -124,6 +124,19 @@ export type ProcessedOrder = Readonly<{
 
 export type ProcessedOrderResponse = Readonly<{ Success: boolean; ProcessedOrders: readonly ProcessedOrder[] }>
 
+/**
+ * GET /Api/Orders/GetOrders — the Open Orders screen's list (not in the public
+ * Swagger). Only the fields read here; rows also carry the customer's address.
+ */
+export type OpenOrder = Readonly<{
+  NumOrderId: string | number
+  ReferenceNum?: string | null
+  Source?: string | null
+  SubSource?: string | null
+  IsCancelled?: boolean | null
+  Items?: ReadonlyArray<Readonly<{ SKU?: string | null; Quantity?: number | null }>> | null
+}>
+
 /** GET /api/Shipping/GetShippingRates?country=&weight= */
 export type ShippingRate = Readonly<{
   Vendor: string

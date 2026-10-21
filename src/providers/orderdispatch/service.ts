@@ -22,11 +22,12 @@ import {
   type ProviderFulfillmentItem,
   type ProviderOrder,
 } from "../../lib/build-order"
+import { findAdoptableOrder } from "../../lib/adopt-order"
 import { OrderDispatchClient, OrderDispatchError } from "../../lib/orderdispatch-client"
 import { odmCountryName } from "../../lib/country"
 import { matchOdmStockItem, type OdmStockItem } from "../../lib/sku"
 import { parcelWeightKg, pickRate, withMarkup } from "../../lib/rates"
-import type { ShippingRate } from "../../lib/orderdispatch-client/types"
+import type { CreateOrderRequest, OpenOrder, ShippingRate } from "../../lib/orderdispatch-client/types"
 import {
   resolveOrderDispatchOptions,
   type OrderDispatchProviderOptions,
@@ -163,15 +164,16 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
 
       // ODM's rules read the customer's Express choice from the SubSource.
       const subSource = `${built.subSource}${optionFor(data.id)?.subSourceSuffix ?? ""}`
-      const created = await this.client_.createOrder(request, { source: this.options_.source, subSource })
+      const created = await this.#createOrAdopt(request, built.reference, subSource)
       this.logger_.info(
-        `[orderdispatch] pushed ${built.reference} (${subSource}) as ODM order ${created.OrderNumber}`
+        `[orderdispatch] pushed ${built.reference} (${subSource}) as ODM order ${created.orderNumber}`
       )
       const pushed: OrderDispatchFulfillmentData = {
-        odOrderNumber: created.OrderNumber,
+        odOrderNumber: created.orderNumber,
         odReference: built.reference,
         odSubSource: subSource,
         odPushedAt: new Date().toISOString(),
+        ...(created.adoptedAfter ? { odAdoptedAfter: created.adoptedAfter } : {}),
       }
       return { data: { ...data, ...pushed }, labels: [] }
     } catch (error) {
@@ -204,6 +206,40 @@ class OrderDispatchFulfillmentService extends AbstractFulfillmentProviderService
       MedusaError.Types.NOT_ALLOWED,
       "OrderDispatch returns go through the OrderDispatch returns portal, not Medusa"
     )
+  }
+
+  /**
+   * CreateOrder — or, when ODM answers with an error but saved the order anyway
+   * (see findAdoptableOrder), the open order it holds for this push.
+   */
+  async #createOrAdopt(
+    request: CreateOrderRequest,
+    reference: string,
+    subSource: string
+  ): Promise<Readonly<{ orderNumber: string; adoptedAfter?: string }>> {
+    const { source } = this.options_
+    try {
+      return { orderNumber: (await this.client_.createOrder(request, { source, subSource })).OrderNumber }
+    } catch (error) {
+      if (!(error instanceof OrderDispatchError)) throw error
+      let adopted: OpenOrder | undefined
+      try {
+        adopted = findAdoptableOrder(await this.client_.getOpenOrders(), {
+          reference,
+          source,
+          subSource,
+          lines: request.OrderItems,
+        })
+      } catch (lookupError) {
+        const reason = lookupError instanceof Error ? lookupError.message : String(lookupError)
+        this.logger_.warn(`[orderdispatch] could not check ODM's open orders for ${reference}: ${reason}`)
+      }
+      if (!adopted) throw error
+      this.logger_.warn(
+        `[orderdispatch] ODM answered "${error.message}" but holds open order ${adopted.NumOrderId} for ${reference}; adopting it`
+      )
+      return { orderNumber: String(adopted.NumOrderId), adoptedAfter: error.message }
+    }
   }
 
   /** ODM's rates for a country and weight, cached so checkout doesn't hammer ODM. */

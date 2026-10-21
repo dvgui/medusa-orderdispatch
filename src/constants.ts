@@ -49,6 +49,8 @@ export type OrderDispatchFulfillmentData = Readonly<{
   odReference?: string
   odSubSource?: string
   odPushedAt?: string
+  /** Set when CreateOrder errored but ODM had saved the order, which was adopted. */
+  odAdoptedAfter?: string
   odCancelRequested?: boolean
   odServiceName?: string
   odTrackingNumber?: string

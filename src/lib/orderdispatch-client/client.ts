@@ -3,6 +3,7 @@ import type {
   CountriesResponse,
   CreateOrderRequest,
   CreateOrderResponse,
+  OpenOrder,
   OrderDispatchCredentials,
   ProcessedOrder,
   ProcessedOrderResponse,
@@ -102,6 +103,12 @@ export class OrderDispatchClient {
     const response = await this.#request<ProcessedOrderResponse>("GET", "/api/ProcessedOrders/GetProcessedOrders")
     if (!response.Success) throw new OrderDispatchError("OrderDispatch GetProcessedOrders was not successful")
     return response.ProcessedOrders ?? []
+  }
+
+  /** Every open (unprocessed) order, with its lines. */
+  async getOpenOrders(): Promise<readonly OpenOrder[]> {
+    const response = await this.#request<OpenOrder[]>("GET", "/Api/Orders/GetOrders")
+    return Array.isArray(response) ? response : []
   }
 
   /** Stock items whose SKU, title or barcode contains `text` (with StockItemId). */

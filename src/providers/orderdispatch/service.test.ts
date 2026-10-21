@@ -106,6 +106,48 @@ describe("OrderDispatchFulfillmentService", () => {
     expect(result.data).toMatchObject({ odSubSource: "buyreta_eu-express" })
   })
 
+  describe("when ODM errors after saving the order", () => {
+    const giftNotes = { IsSuccessfull: false, Error: "Procedure or function GetSetGiftNotes has too many arguments specified." }
+    const saved = {
+      NumOrderId: "3242804",
+      ReferenceNum: "1201",
+      Source: "WebApp",
+      SubSource: "buyreta_eu",
+      IsCancelled: false,
+      Items: [{ SKU: "RETATRUTIDE-10MG", Quantity: 1 }],
+    }
+    const push = (openOrders: Response) => {
+      fetchSpy
+        .mockResolvedValueOnce(answer({ token: jwt }))
+        .mockResolvedValueOnce(answer([{ StockItemId: "si-1", Sku: "RETATRUTIDE-10MG" }]))
+        .mockResolvedValueOnce(answer(["Germany"]))
+        .mockResolvedValueOnce(answer(giftNotes))
+        .mockResolvedValueOnce(openOrders)
+      return make().createFulfillment({ id: "od-intl" }, items, order, { metadata: {} } as never)
+    }
+
+    it("adopts the open order ODM holds for this push", async () => {
+      const result = await push(answer([saved]))
+      expect(result.data).toMatchObject({
+        odOrderNumber: "3242804",
+        odReference: "1201",
+        odSubSource: "buyreta_eu",
+        odAdoptedAfter: expect.stringContaining("GetSetGiftNotes"),
+      })
+      expect((fetchSpy.mock.calls[4] as [URL])[0].pathname).toBe("/Api/Orders/GetOrders")
+    })
+
+    it("still fails when ODM holds no matching order", async () => {
+      await expect(push(answer([{ ...saved, Items: [{ SKU: "RETATRUTIDE-10MG", Quantity: 2 }] }]))).rejects.toThrow(
+        "OrderDispatch: OrderDispatch rejected order 1201: Procedure or function GetSetGiftNotes"
+      )
+    })
+
+    it("still fails with ODM's error when the open orders can't be read", async () => {
+      await expect(push(answer({ Message: "error" }, 500))).rejects.toThrow("GetSetGiftNotes")
+    })
+  })
+
   it("does not push twice when the fulfillment already has an ODM order", async () => {
     const data = { odOrderNumber: "9001", odReference: "1201" }
     const result = await make().createFulfillment(data, items, order, {} as never)
